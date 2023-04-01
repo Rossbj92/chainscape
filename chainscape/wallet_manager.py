@@ -7,6 +7,8 @@ from typing import List, Optional, Union
 import pandas as pd
 from web3 import Web3
 
+from wallet import Wallet
+from csv_utils import load_wallets_from_csv, export_wallets_to_csv
 from blockchain import Blockchain
 from etherscan_api import EtherscanAPI
 from log import logger
@@ -17,56 +19,57 @@ class WalletManager:
     A class for managing wallets on the Ethereum blockchain.
     """
 
-    def __init__(self, rpc_url: str = None, all_wallets_csv: str = None, etherscan_api_key: str = None,
-                 binance_api_key: str = None, binance_secret_key: str = None):
+    def __init__(
+            self, rpc_url: str = None, wallets_csv_path: str = None,
+            etherscan_api_key: str = None
+    ):
         """
         Args:
             rpc_url: The URL for the Ethereum RPC node.
             all_wallets_csv: The file path to a CSV file containing a list of all wallets to manage.
             etherscan_api_key: The API key for Etherscan.
-            binance_api_key: The API key for Binance.
-            binance_secret_key: The secret key for Binance.
         """
         self.blockchain = Blockchain(rpc_url)
-        self.all_wallets_csv = all_wallets_csv
-        self.wallets = self.load_wallets_from_csv() if all_wallets_csv else []
+        self.wallets_csv_path = wallets_csv_path
+        self.wallets = self.load_wallets_from_csv() if wallets_csv_path else []
         self.etherscanAPI = EtherscanAPI(etherscan_api_key=etherscan_api_key) if etherscan_api_key else None
-        self.disperse_contract_address = "0xD152f549545093347A162Dce210e7293f1452150"  # Disperse.app contract address
-        self.disperse_abi = json.loads(
-            '[{"constant":false,"inputs":[{"name":"token","type":"address"},{"name":"recipients","type":"address[]"},{"name":"values","type":"uint256[]"}],"name":"disperse","outputs":[],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"recipients","type":"address[]"},{"name":"values","type":"uint256[]"}],"name":"disperseEther","outputs":[],"payable":true,"stateMutability":"payable","type":"function"},{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"}]')
-        self.binance_api_key = binance_api_key
-        self.binance_secret_key = binance_secret_key
 
-    def load_wallets_from_csv(self) -> pd.DataFrame:
-        """Load wallets from a CSV file.
-
-        Returns:
-            A list of all wallets loaded from the CSV file.
-        """
-        wallets = pd.read_csv(self.all_wallets_csv)
+    def load_wallets_from_csv(self, wallets_csv_path: Optional[str] = None) -> pd.DataFrame:
+        """Load wallets from csv file."""
+        if not self.wallets_csv_path:
+            self.wallets_csv_path = wallets_csv_path
+        wallets = load_wallets_from_csv(self.wallets_csv_path)
         return wallets
 
-    def get_receiving_wallets(self, holding_wallet: str, num_needed: int) -> List[str]:
-        """
-        Get a list of receiving wallets in order that they appear in the csv.
+    def get_wallet_dataframe(self):
+        """Returns current wallets as Pandas dataframe."""
+        wallet_df = pd.DataFrame({
+            'address': [wallet.address for wallet in self.wallets],
+            'name': [wallet.name for wallet in self.wallets],
+            'private_key': [wallet.private_key for wallet in self.wallets]
+        })
+        return wallet_df
+
+    def get_wallets(self, excluded_address: Optional[str] = '', num_needed: Optional[int] = None) -> List[str]:
+        """ Get a list of receiving wallets in order that they appear in the csv.
 
         Args:
-            holding_wallet: The wallet holding the funds to disperse.
+            excluded_address: Wallet to be excluded from list.
             num_needed: The number of receiving wallets needed.
 
         Returns:
             A list of receiving wallets.
         """
         receiving_wallets = []
-        for address in self.wallets['public_key']:
-            if address != holding_wallet:
-                receiving_wallets.append(address)
-                if len(receiving_wallets) >= num_needed:
+        for wallet in self.wallets:
+            if wallet.address.lower() != excluded_address.lower():
+                receiving_wallets.append(wallet.address)
+                if num_needed and len(receiving_wallets) >= num_needed:
                     break
         return receiving_wallets
 
     def add_wallet(self, wallet_name: str = None, address: str = None, private_key: str = None) -> None:
-        """Add a wallet to the wallets dataframe.
+        """Add a wallet to the wallet manager.
 
         If no address is added, public address will be recovered from private key.
 
@@ -84,24 +87,18 @@ class WalletManager:
             assert self.blockchain, 'Need RPC url to recover public address from private key.'
             address = self.blockchain.w3.eth.account.from_key(private_key).address
 
-        assert self.wallets[self.wallets['public_key'] == address].shape[0] == 0, 'Wallet already present in csv.'
+        assert address not in (w.address for w in self.wallets), 'Wallet already loaded.'
 
-        self.wallets.loc[len(self.wallets), ['name', 'public_key', 'private_key']] = [wallet_name, address, private_key]
-        logger.info(f'Wallet added to csv.\nName: {wallet_name}\nAddress: {address}\nPrivate key: {private_key}')
+        new_wallet = Wallet(name=wallet_name, address=address, private_key=private_key)
+        self.wallets.append(new_wallet)
+        logger.info(f'Wallet added to manager.\nName: {wallet_name}\nAddress: {address}\nPrivate key: {private_key}')
         return
 
     def remove_wallet(self, address: str) -> None:
-        """Removes a wallet from the wallets DataFrame.
+        """Removes a wallet from the wallets DataFrame. """
 
-        Args:
-            address: The public address of the wallet to remove.
-
-        Raises:
-            AssertionError: If the wallet address is not in the wallets DataFrame.
-        """
-
-        assert self.wallets[self.wallets['public_key'] == address].shape[0] > 0, 'Address not in csv.'
-        self.wallets.drop(self.wallets[self.wallets['public_key'] == address].index, inplace=True)
+        assert address in (w.address for w in self.wallets), 'Address not in csv.'
+        self.wallets = [wallet for wallet in self.wallets if wallet.address != address]
         logger.info(f'{address} removed from wallets.')
         return
 
@@ -132,10 +129,10 @@ class WalletManager:
         if not wallets:
             wallets = self.wallets
         else:
-            wallets = self.wallets[self.wallets['public_key'].isin(wallets)]
+            wallets = self.wallets[self.wallets['address'].isin(wallets)]
             assert wallets.shape[0] != 0, 'If entering multiple wallets, all must be in wallets csv.'
 
-        wallets_needed = set(wallet['public_key'] for wallet in wallets.to_dict('records'))
+        wallets_needed = set(wallet['address'] for wallet in wallets.to_dict('records'))
         wallet_dict = {}
         def worker(wallet):
             try:
@@ -161,7 +158,7 @@ class WalletManager:
         end = time.time()
         logger.info(f'{len(wallets)} wallets found in {end - start} seconds.')
 
-        self.wallets['balance'] = self.wallets['public_key'].replace(wallet_dict)
+        self.wallets['balance'] = self.wallets['address'].replace(wallet_dict)
         return
 
     def export_wallets_to_csv(self, file_path: str) -> None:
@@ -251,7 +248,7 @@ class WalletManager:
         else:
             self.blockchain = Blockchain(etherscan_api_key)
         if wallets is None:
-            wallets = [wallet['public_key'] for wallet in self.wallets.to_dict('records')]
+            wallets = [wallet['address'] for wallet in self.wallets.to_dict('records')]
 
         contract_address = Web3.toChecksumAddress(contract_address)
         contract_abi = self.etherscanAPI.get_contract_abi(contract_address=contract_address)
