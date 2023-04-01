@@ -38,7 +38,7 @@ class EtherscanAPI:
         response = requests.get(url)
         response.raise_for_status()
         response_json = response.json()
-        if response_json["status"] == "0":
+        if response_json["status"] == "0" and response_json['message'] != "No transactions found":
             raise Exception(f"Etherscan API returned an error: {response_json['message']}")
         return response_json['result']
 
