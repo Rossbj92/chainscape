@@ -18,7 +18,7 @@ class EtherscanAPI:
         """
         self.etherscan_api_key = etherscan_api_key
 
-    def _make_api_call(self, endpoint: str, module: str, address: str, **params) -> Dict:
+    def _make_api_call(self, endpoint: str,  module: str, address: str, **params) -> Dict:
         """Makes an API call to the Etherscan API.
 
         Args:
@@ -33,9 +33,16 @@ class EtherscanAPI:
         Raises:
             Exception: If the Etherscan API returns an error.
         """
-        params.update({'module': module, 'action': endpoint, 'apikey': self.etherscan_api_key})
-        url = f'{BASE_URL}?{"&".join(f"{k}={v}" for k, v in params.items())}&address={address}'
-        response = requests.get(url)
+        url = f'{BASE_URL}'
+        query_params = {
+            'module': module,
+            'action': endpoint,
+            'address': address,
+            **params,
+            'apikey': self.etherscan_api_key
+        }
+        logger.info(f'Requesting {url} with query params {query_params}')
+        response = requests.get(url, params=query_params)
         response.raise_for_status()
         response_json = response.json()
         if response_json["status"] == "0" and response_json['message'] != "No transactions found":
