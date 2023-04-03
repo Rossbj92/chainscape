@@ -39,9 +39,6 @@ wallet_manager = WalletManager(
     etherscan_api_key="your_etherscan_api_key"
 )
 
-# Wallet csv read as Pandas dataframe
-wallet_manager.wallets.head()
-
 # Add a new wallet 
 wallet_manager.add_wallet(wallet_name="New Wallet", address="0x123...", private_key="0xabc...")
 
