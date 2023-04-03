@@ -1,11 +1,11 @@
 from time import sleep
 from typing import List, Union, Dict
+
 from web3 import Web3
 
-from log import logger
-
-from etherscan_api import EtherscanAPI
 from constants.eth_blockchain import TransactionFields
+from etherscan_api import EtherscanAPI
+from log import logger
 
 
 class ContractTransaction:
@@ -24,12 +24,12 @@ class ContractTransaction:
             **kwargs: Dict
     ):
 
-        gas_estimate = getattr(contract_instance.functions, function_name)(*function_args).estimateGas({
+        gas_estimate = getattr(contract_instance.functions, function_name)(*function_args).estimate_gas({
             'from': sender_wallet,
             'value': value
         })
 
-        transaction_data = getattr(contract_instance.functions, function_name)(*function_args).buildTransaction({
+        transaction_data = getattr(contract_instance.functions, function_name)(*function_args).build_transaction({
             'gas': gas_estimate,
             'nonce': self.w3.eth.get_transaction_count(sender_wallet),
         })
@@ -39,16 +39,16 @@ class ContractTransaction:
             'value': value,
             'gas': gas_estimate,
             'nonce': self.w3.eth.get_transaction_count(sender_wallet),
-            'chainId': self.w3.eth.chainId,
+            'chainId': self.w3.eth.chain_id,
             'data': transaction_data['data']
         }
 
-        gas_price = {k: Web3.toWei(v, 'gwei') for k, v in kwargs.items() if v and k in [TransactionFields.MAX_FEE_KEY, TransactionFields.MAX_PRIORITY_KEY]}
+        gas_price = {k: Web3.to_wei(v, 'gwei') for k, v in kwargs.items() if v and k in [TransactionFields.MAX_FEE_KEY, TransactionFields.MAX_PRIORITY_KEY]}
         if gas_price:
             logger.info(f'Custom gas settings: {kwargs[TransactionFields.MAX_FEE_KEY]} max fee {kwargs[TransactionFields.MAX_PRIORITY_KEY]} priority fee.')
         else:
-            gas_price = {'gasPrice': self.w3.eth.gasPrice}
-            est_gwei = round(float(Web3.fromWei(gas_price['gasPrice'], 'gwei')))
+            gas_price = {'gasPrice': self.w3.eth.gas_price}
+            est_gwei = round(float(Web3.from_wei(gas_price['gasPrice'], 'gwei')))
             logger.info(f'Gas estimate for current tx: {est_gwei} gwei.')
 
         transaction.update(gas_price)
@@ -56,6 +56,7 @@ class ContractTransaction:
         return transaction, gas_estimate
 
     def send_transaction(self, transaction: dict, private_key: str) -> str:
+        """Sign and send eth transaction."""
         signed_txn = self.w3.eth.account.sign_transaction(transaction, private_key)
         tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
         return tx_hash.hex()
@@ -69,7 +70,7 @@ class ContractTransaction:
         Returns:
             The status of the transaction: "pending", "failed", or "success".
         """
-        receipt = self.w3.eth.getTransactionReceipt(tx_hash)
+        receipt = self.w3.eth.get_transaction_receipt(tx_hash)
         if receipt is None:
             return "pending"
         elif receipt["status"] == 0:
@@ -115,10 +116,10 @@ class Disperser:
         assert (max_fee is not None and max_priority_fee is not None) or (
                     max_fee is None and max_priority_fee is None), "Either both max_fee and max_priority_fee should be provided or both should be None."
 
-        sender_wallet = Web3.toChecksumAddress(sender_wallet)
-        receiving_wallets = [Web3.toChecksumAddress(wallet) for wallet in receiving_wallets]
+        sender_wallet = Web3.to_checksum_address(sender_wallet)
+        receiving_wallets = [Web3.to_checksum_address(wallet) for wallet in receiving_wallets]
 
-        amounts_wei = [Web3.toWei(amount, 'ether') for amount in amounts]
+        amounts_wei = [Web3.to_wei(amount, 'ether') for amount in amounts]
 
         transaction, gas_estimate = self.tx_handler.build_transaction(
             disperse_instance,
@@ -166,8 +167,8 @@ class Disperser:
                     max_fee is None and max_priority_fee is None), \
             "Either both max_fee and max_priority_fee should be provided or both should be None."
 
-        holding_wallet = Web3.toChecksumAddress(holding_wallet)
-        receiving_wallets = [Web3.toChecksumAddress(address) for address in receiving_wallets]
+        holding_wallet = Web3.to_checksum_address(holding_wallet)
+        receiving_wallets = [Web3.to_checksum_address(address) for address in receiving_wallets]
 
         tx_hashes = []
         for token_id, receiving_wallet in zip(token_ids, receiving_wallets):
