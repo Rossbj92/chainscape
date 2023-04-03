@@ -13,5 +13,5 @@ class DisperseConstants:
     )
 
 class TransactionFields:
-    MAX_FEE_KEY = "maxFeePerGas"
-    MAX_PRIORITY_KEY = "maxPriorityFeePerGas"
+    MAX_FEE_KEY: str = "maxFeePerGas"
+    MAX_PRIORITY_KEY: str = "maxPriorityFeePerGas"

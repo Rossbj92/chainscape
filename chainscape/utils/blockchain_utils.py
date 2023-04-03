@@ -7,7 +7,7 @@ def get_current_gas_price(w3: Web3) -> int:
     Returns:
         The current gas price in ether.
     """
-    return round(float(Web3.fromWei(w3.eth.gasPrice, 'gwei')))
+    return round(float(Web3.from_wei(w3.eth.gas_price, 'gwei')))
 
 
 def get_wallet_balance(w3: Web3, wallet_address: str, return_eth=True) -> float:
@@ -22,11 +22,11 @@ def get_wallet_balance(w3: Web3, wallet_address: str, return_eth=True) -> float:
         The balance of the specified wallet.
     """
 
-    if wallet_address and not Web3.isAddress(wallet_address):
+    if wallet_address and not Web3.is_address(wallet_address):
         raise ValueError("Invalid wallet address")
-    wallet = Web3.toChecksumAddress(wallet_address)
-    balance = w3.eth.getBalance(wallet)
+    wallet = Web3.to_checksum_address(wallet_address)
+    balance = w3.eth.get_balance(wallet)
     if return_eth:
-        return float(Web3.fromWei(balance, 'ether'))
+        return float(Web3.from_wei(balance, 'ether'))
     else:
         return float(balance)

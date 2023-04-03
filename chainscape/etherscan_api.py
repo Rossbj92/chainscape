@@ -41,7 +41,6 @@ class EtherscanAPI:
             **params,
             'apikey': self.etherscan_api_key
         }
-        logger.info(f'Requesting {url} with query params {query_params}')
         response = requests.get(url, params=query_params)
         response.raise_for_status()
         response_json = response.json()
@@ -128,5 +127,6 @@ class EtherscanAPI:
         elif token_type == 'erc1155':
             endpoint = ACTIONS["TOKEN1155TX"]
         result = self._make_api_call(endpoint, module, holding_wallet.lower(), contractaddress=contract_address.lower())
-        logger.info(f"Retrieved token transactions for wallet and contract: wallet={holding_wallet}, contract={contract_address}")
+        logger.info(f"Retrieved {len(result)} token transactions for wallet and contract: "
+                    f"wallet={holding_wallet}, contract={contract_address}")
         return result
