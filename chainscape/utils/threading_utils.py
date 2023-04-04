@@ -71,6 +71,23 @@ def worker_get_wallet_balances(wallet: str, get_wallet_balance: Callable) -> Uni
         return wallet
 
 
+def worker_get_transactions(wallet: str, get_transactions: Callable) -> Union[tuple, str]:
+    """Get the balance of a wallet.
+
+        Args:
+            wallet: The wallet to get the balance of.
+            get_wallet_balance: The function to use to get the balance.
+
+        Returns:
+            A tuple containing the wallet and its balance or a string containing the wallet.
+    """
+    try:
+        balance = get_transactions(wallet)
+        return (wallet, balance)
+    except:
+        time.sleep(1)
+        return wallet
+
 def worker_find_tokens(
         wallet: str,
         contract_address: str,

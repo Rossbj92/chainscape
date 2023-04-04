@@ -66,7 +66,7 @@ class EtherscanAPI:
         logger.info(f"Retrieved ABI for contract: address={contract_address}")
         return result
 
-    def get_contract_transactions(self, contract_address: str) -> List[Dict]:
+    def get_transactions(self, contract_address: str) -> List[Dict]:
         """Retrieves a list of transactions for the specified contract.
 
         Limited by the Etherscan API to only 10k transactions available.
@@ -83,7 +83,7 @@ class EtherscanAPI:
         endpoint = ACTIONS["TXLIST"]
         module = MODULES['ACCOUNT']
         result = self._make_api_call(endpoint, module, contract_address.lower())
-        logger.info(f"Retrieved transactions for contract: address={contract_address}")
+        logger.info(f"Retrieved {len(result)} transactions for address={contract_address}")
         return result
 
     def get_contract_source_code(self, contract_address: str) -> str:
