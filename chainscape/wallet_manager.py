@@ -1,4 +1,6 @@
+import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Union, Dict
 
 import pandas as pd
@@ -8,6 +10,8 @@ from blockchain import Blockchain
 from etherscan_api import EtherscanAPI
 from log import logger
 from utils.csv_utils import load_wallets_from_csv, export_wallets_to_csv
+from utils.wallet_manager_utils import get_gas_costs
+from utils.threading_utils import execute_concurrent_tasks, worker_get_transactions
 from wallet import Wallet
 from wallet_contents import WalletContents
 
@@ -116,6 +120,9 @@ class WalletManager:
     ) -> Optional[List[str]]:
         """Returns the balances of the specified wallets.
 
+        By default, method sends concurrent requests. If you are concerned about
+        API rate limits or usage caps, it is suggested to set it to False.
+
         Args:
             wallets: A list of public addresses of the wallets to check. If not provided,
             checks all loaded wallets.
@@ -207,6 +214,10 @@ class WalletManager:
                 wallets DataFrame.
             etherscan_api_key: The API key for Etherscan.
             rpc_url: The URL for the Ethereum RPC node.
+            multithread: Whether to utilize multithreading.
+
+        By default, method sends concurrent requests. If you are concerned about
+        RPC rate limits or usage caps, it is suggested to set it to False.
 
         Returns:
             A pandas DataFrame containing information about all tokens found.
@@ -232,3 +243,57 @@ class WalletManager:
                                                    wallets=wallets,
                                                    multithread=multithread)
         return results
+
+    def get_wallets_gas_costs(
+            self,
+            wallets: Union[List, str] = None,
+            etherscan_api_key: str = None,
+            multithread: bool = True
+    ) -> Optional[List[str]]:
+        """Returns total gas costs spent by wallets in ETH.
+
+        By default, method sends concurrent requests. If you are concerned about
+        API rate limits or usage caps, it is suggested to set it to False.
+
+        Args:
+            wallets: A list of public addresses of the wallets to check. If not provided,
+            checks all loaded wallets.
+            etherscan_api_key: Etherscan API key.
+            multithread: Whether to utilize multithreading
+
+        Returns:
+            Updaed balances attribute in wallets.
+
+        Raises:
+            AssertionError: If the Ethereum RPC URL is not provided and the WalletManager object does not have a
+                blockchain object.
+        """
+        if not etherscan_api_key:
+            assert self.etherscanAPI, 'Must enter URL for ETH RPC.'
+        else:
+            self.etherscanAPI = Blockchain(etherscan_api_key)
+
+        if not wallets:
+            wallets = [wallet.address for wallet in self.wallets]
+
+        if multithread:
+            with ThreadPoolExecutor() as executor:
+                results = execute_concurrent_tasks(
+                    wallets,
+                    worker_get_transactions,
+                    executor,
+                    self.etherscanAPI.get_transactions
+                )
+            executor.shutdown(wait=True)
+        else:
+            results = []
+            logger.info(f'Beginning search for {len(wallets)} wallets.')
+            start = time.time()
+            for wallet in wallets:
+                result = self.etherscanAPI.get_transactions(wallet)
+                results.append((wallet, result))
+            end = time.time()
+            logger.info(f'{len(wallets)} wallets processed in {(end - start)} seconds.')
+
+        total_cost = get_gas_costs(results)
+        return total_cost
