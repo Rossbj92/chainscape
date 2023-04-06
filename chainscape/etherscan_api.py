@@ -2,7 +2,7 @@ from typing import Dict, List
 
 import requests
 
-from constants.etherscan import BASE_URL, MODULES, ACTIONS
+from constants.etherscan import BASE_URL, MODULES, ACTIONS, MAX_RESULTS
 from log import logger
 
 
@@ -66,10 +66,8 @@ class EtherscanAPI:
         logger.info(f"Retrieved ABI for contract: address={contract_address}")
         return result
 
-    def get_transactions(self, contract_address: str) -> List[Dict]:
+    def get_transactions(self, address: str) -> List[Dict]:
         """Retrieves a list of transactions for the specified contract.
-
-        Limited by the Etherscan API to only 10k transactions available.
 
         Args:
             contract_address: The address of the contract.
@@ -82,9 +80,15 @@ class EtherscanAPI:
         """
         endpoint = ACTIONS["TXLIST"]
         module = MODULES['ACCOUNT']
-        result = self._make_api_call(endpoint, module, contract_address.lower())
-        logger.info(f"Retrieved {len(result)} transactions for address={contract_address}")
-        return result
+        results = self._make_api_call(endpoint, module, address.lower())
+        if len(results) == MAX_RESULTS:
+            result = results.copy()
+            while len(result) == MAX_RESULTS:
+                start_block = int(result[-1]['blockNumber'])
+                result = self._make_api_call(endpoint, module, address.lower(), startblock=start_block)
+                results.extend(result)
+        logger.info(f"Retrieved {len(results)} transactions for address={address}")
+        return results
 
     def get_contract_source_code(self, contract_address: str) -> str:
         """Retrieves the source code of the specified contract.
@@ -126,7 +130,13 @@ class EtherscanAPI:
             endpoint = ACTIONS["TOKENNFTTX"]
         elif token_type == 'erc1155':
             endpoint = ACTIONS["TOKEN1155TX"]
-        result = self._make_api_call(endpoint, module, holding_wallet.lower(), contractaddress=contract_address.lower())
-        logger.info(f"Retrieved {len(result)} token transactions for wallet and contract: "
+        results = self._make_api_call(endpoint, module, holding_wallet.lower(), contractaddress=contract_address.lower())
+        if len(results) == MAX_RESULTS:
+            result = results.copy()
+            while len(result) == MAX_RESULTS:
+                start_block = int(result[-1]['blockNumber'])
+                result = self._make_api_call(endpoint, module, holding_wallet.lower(), contractaddress=contract_address.lower(), startblock=start_block)
+                results.extend(result)
+        logger.info(f"Retrieved {len(results)} token transactions for wallet and contract: "
                     f"wallet={holding_wallet}, contract={contract_address}")
-        return result
+        return results

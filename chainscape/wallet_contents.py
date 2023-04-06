@@ -8,7 +8,7 @@ from web3 import Web3
 from blockchain import Blockchain
 from etherscan_api import EtherscanAPI
 from log import logger
-from utils.threading_utils import execute_concurrent_tasks, worker_get_wallet_balances, worker_find_tokens
+from utils.threading_utils import execute_concurrent_tasks, worker_find_tokens, worker_wallet_etherscan_call
 
 
 class WalletContents:
@@ -67,7 +67,7 @@ class WalletContents:
             with ThreadPoolExecutor() as executor:
                 results = execute_concurrent_tasks(
                     wallets,
-                    worker_get_wallet_balances,
+                    worker_wallet_etherscan_call,
                     executor,
                     self.blockchain.get_wallet_balance
                 )

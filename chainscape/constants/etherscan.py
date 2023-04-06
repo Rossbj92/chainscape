@@ -14,3 +14,5 @@ ACTIONS: Dict[str, str] = {
     "SOURCECODE": "getsourcecode",
     "TOKEN1155TX": "token1155tx"
 }
+
+MAX_RESULTS: int = 10000
