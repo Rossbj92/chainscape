@@ -11,7 +11,7 @@ from etherscan_api import EtherscanAPI
 from log import logger
 from utils.csv_utils import load_wallets_from_csv, export_wallets_to_csv
 from utils.wallet_manager_utils import get_gas_costs
-from utils.threading_utils import execute_concurrent_tasks, worker_get_transactions
+from utils.threading_utils import execute_concurrent_tasks, worker_wallet_etherscan_call
 from wallet import Wallet
 from wallet_contents import WalletContents
 
@@ -280,7 +280,7 @@ class WalletManager:
             with ThreadPoolExecutor() as executor:
                 results = execute_concurrent_tasks(
                     wallets,
-                    worker_get_transactions,
+                    worker_wallet_etherscan_call,
                     executor,
                     self.etherscanAPI.get_transactions
                 )
