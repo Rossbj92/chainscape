@@ -31,12 +31,13 @@ def execute_concurrent_tasks(
         executor = ThreadPoolExecutor()
     else:
         executor_created = False
-
+    request_counter = 0
     start = time.time()
     logger.info(f'Beginning search for {len(wallets_needed)} wallets.')
     try:
         while wallets_needed:
             futures = [executor.submit(task, wallet, *args, **kwargs) for wallet in wallets_needed]
+            request_counter += len(futures)
             for future in as_completed(futures):
                 result = future.result()
                 if isinstance(result, str):
@@ -49,44 +50,28 @@ def execute_concurrent_tasks(
         if executor_created:
             executor.shutdown(wait=True)
     end = time.time()
-    logger.info(f'{len(wallets)} wallets processed in {(end - start)} seconds.')
+    logger.info(f'{len(wallets)} wallets processed in {(end - start)} seconds. {request_counter} requests sent.')
     return results
 
 
-def worker_get_wallet_balances(wallet: str, get_wallet_balance: Callable) -> Union[tuple, str]:
-    """Get the balance of a wallet.
+def worker_wallet_etherscan_call(wallet: str, etherscan_func: Callable, *args, **kwargs) -> Union[tuple, str]:
+    """Get the results of a wallet and specified function.
 
         Args:
-            wallet: The wallet to get the balance of.
-            get_wallet_balance: The function to use to get the balance.
+            wallet: The wallet being passed in the function.
+            etherscan_func: The function being called.
 
         Returns:
-            A tuple containing the wallet and its balance or a string containing the wallet.
+            A tuple containing the wallet and results of the function called, or just
+            the wallet address if the function fails.
     """
     try:
-        balance = get_wallet_balance(wallet)
-        return (wallet, balance)
+        results = etherscan_func(wallet, *args, **kwargs)
+        return (wallet, results)
     except:
         time.sleep(1)
         return wallet
 
-
-def worker_get_transactions(wallet: str, get_transactions: Callable) -> Union[tuple, str]:
-    """Get the balance of a wallet.
-
-        Args:
-            wallet: The wallet to get the balance of.
-            get_wallet_balance: The function to use to get the balance.
-
-        Returns:
-            A tuple containing the wallet and its balance or a string containing the wallet.
-    """
-    try:
-        balance = get_transactions(wallet)
-        return (wallet, balance)
-    except:
-        time.sleep(1)
-        return wallet
 
 def worker_find_tokens(
         wallet: str,
